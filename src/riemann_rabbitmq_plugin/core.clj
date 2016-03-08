@@ -78,12 +78,11 @@
   (debug "Parsing message with parser function; msg:" (String. message))
   (try
     (let [event (parser-fn message metadata)]
-      (if (and (instance? clojure.lang.Associative event) (every? keyword? (keys event)))
+      (if (and (instance? clojure.lang.Associative event)
+               (every? keyword? (keys event)))
         (if (number? (:time event)) event
             (assoc event :time (unix-time)))
-        (do
-          (warn "Check yer parser, message not parsed to a proper map like object. Dropping" event)
-          nil)))
+        (warn "Check yer parser, message not parsed to a proper map like object. Dropping" event)))
     (catch Exception e
       (warn e "Failed to parse message"))))
 
@@ -115,21 +114,29 @@
     (locking this
       (when-not @killer
         (debug "Openning new RabbitMQ connection")
-        (let [{:keys [parser-fn bindings exchange connection-opts prefetch-count tags]
-               :as opts
-              } opts
+        (let [{:keys [parser-fn bindings exchange connection-opts
+                      prefetch-count tags]
+               :as opts} opts
               conn (rmq/connect connection-opts)
-              ch (lch/open conn)
-             ]
+              ch (lch/open conn)]
           (lb/qos ch prefetch-count)
           (doseq [binding-spec bindings]
-            (let [queue-name (:queue (lq/declare ch (get binding-spec :queue "") (get binding-spec :opts {:auto-delete true :exclusive true})))]
+            (let [queue-name
+                  (:queue (lq/declare
+                           ch
+                           (get binding-spec :queue "")
+                           (get binding-spec :opts {:auto-delete true
+                                                    :exclusive true})))]
               (doseq [[exchange binding-keys] (:bind-to binding-spec)
-                      binding-key (if (seq binding-keys) binding-keys [binding-keys])]
-                (infof "binding queue %s to exchange %s with key %s" queue-name exchange binding-key)
+                      binding-key (if (seq binding-keys)
+                                    binding-keys
+                                    [binding-keys])]
+                (infof "binding queue %s to exchange %s with key %s"
+                       queue-name exchange binding-key)
                 (lq/bind ch queue-name exchange {:routing-key binding-key}))
               (info "Starting RabbitMQ consumer thread")
-              (lc/subscribe ch queue-name (partial message-handler parser-fn tags core))))
+              (lc/subscribe ch queue-name
+                            (partial message-handler parser-fn tags core))))
           (reset! killer (fn []
                            (try
                              (when (lch/open? ch) (lch/close ch))
@@ -213,5 +220,8 @@
   (let [pool (publisher/get-pool (:pool-opts opts))]
     (fn [event]
       (with-pool [publisher-client pool (get opts :claim-timeout 5)]
-        (let [routing-key (if (fn? routing-key) (routing-key event) routing-key)]
-          (publisher/publish publisher-client exchange routing-key (encoding-fn event) message-opts))))))
+        (let [routing-key (if (fn? routing-key)
+                            (routing-key event)
+                            routing-key)]
+          (publisher/publish publisher-client exchange routing-key
+                             (encoding-fn event) message-opts))))))
