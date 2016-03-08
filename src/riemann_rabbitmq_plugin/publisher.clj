@@ -5,12 +5,16 @@
    [langohr.basic      :as lb]
    [riemann.pool       :refer [with-pool fixed-pool]]))
 
-(def default-opts {:pool-size 1 :block-start true :regenerate-interval 5 :connection-opts {}})
+(def default-opts {:pool-size 1
+                   :block-start true
+                   :regenerate-interval 5
+                   :connection-opts {}})
 
 (defprotocol ClientPool
   (open [this])
   (close [this])
-  (publish [this exchange routing-key message opts] [this exchange routing-key message]))
+  (publish [this exchange routing-key message opts]
+    [this exchange routing-key message]))
 
 (defrecord RabbitMQPublisher [connection-opts]
   ClientPool
@@ -24,7 +28,8 @@
   (publish [{ch :ch} exchange routing-key message opts]
     (lb/publish ch exchange routing-key message opts))
   (publish [this exchange routing-key message]
-    (publish this exchange routing-key message {:mandatory false :immediate false})))
+    (publish this exchange routing-key message
+             {:mandatory false :immediate false})))
 
 (defn get-pool [opts]
   "The opts map can contain the following items:
